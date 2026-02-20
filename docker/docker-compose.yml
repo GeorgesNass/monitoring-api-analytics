@@ -1,0 +1,19 @@
+version: "3.9"                                   # Docker Compose version
+
+services:
+  app:                                           # Main monitoring API analytics service
+    build:
+      context: .                                 # Project root as build context
+      dockerfile: docker/Dockerfile              # Dockerfile used for build
+    container_name: monitoring-api-analytics-app # Container name
+    volumes:
+      - .:/app                                   # Mount full project
+      - ./data:/app/data                         # Mount data directory
+      - ./artifacts:/app/artifacts               # Mount artifacts directory
+      - ./logs:/app/logs                         # Mount logs directory
+      - ./secrets:/app/secrets                   # Mount service account credentials
+    env_file:
+      - .env                                     # Environment variables
+    ports:
+      - "8000:8000"                              # Expose FastAPI port
+    command: python main.py --run-api            # Start FastAPI service
