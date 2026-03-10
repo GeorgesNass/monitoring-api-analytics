@@ -1,128 +1,41 @@
 # 📊 Monitoring API Analytics – Cloud Logs to Dashboard Pipeline
 
-## 1. Project Overview
-
-This project implements a complete **API monitoring analytics pipeline** from raw Cloud Logging data to interactive dashboards.
-
-The objective is to:
-
-- Extract logs from Google Cloud Logging (Cloud Run / Kubernetes)
-- Normalize heterogeneous log formats into a unified schema
-- Store structured data in BigQuery or SQLite
-- Generate production-ready monitoring metrics
-- Visualize KPIs in Looker Studio or Grafana
-
-The pipeline transforms distributed API logs into structured monitoring intelligence.
+The pipeline transforms distributed API logs into **structured monitoring intelligence and operational dashboards**.
 
 ---
 
-## 2. Problem Statement
+## 🎯 Project Overview
 
-Modern API systems generate logs across:
+Main capabilities:
 
-- Cloud Run services
-- Kubernetes workloads
-- Local JSON / JSONL / CSV exports
+* Extract logs from **Google Cloud Logging** (Cloud Run / Kubernetes)
+* Normalize heterogeneous log formats into a **unified schema**
+* Store structured data in **BigQuery or SQLite**
+* Generate **production-ready monitoring metrics**
+* Visualize KPIs in **Looker Studio or Grafana**
 
-Challenges:
-
-- Inconsistent log schemas
-- Missing fields across environments
-- Latency measurement inconsistencies
-- Error rate aggregation
-- SLA monitoring
-- Anomaly detection
-
-This project addresses these constraints through:
-
-- Unified schema normalization
-- Realistic fallback values when fields are missing
-- SQL-based metrics layer
-- Window functions for advanced analytics
-- Reproducible dashboard metrics
-- Clean orchestration pipeline
+The system converts distributed API logs into **actionable monitoring analytics**.
 
 ---
 
-## 3. Monitoring Strategy
+## ⚙️ Tech Stack
 
-### Core Observability Dimensions
+Core technologies used in the project:
 
-| Dimension | Description | Example |
-|------------|------------|----------|
-| event_timestamp | Exact time of API request | 2024-03-18T10:15:23Z |
-| service | Microservice handling the request | user-service |
-| api_path | Endpoint path | /api/v1/users |
-| http_method | HTTP verb | GET |
-| status_code | HTTP response code | 200 |
-| latency_ms | Request execution time in milliseconds | 245 |
-| user_uid | Unique user identifier (if available) | user_89234 |
-| env | Environment name | prod |
-
-### Key Monitoring Objectives
-
-| Objective | Why It Matters | Example Insight |
-|------------|----------------|----------------|
-| Latency degradation detection | Identify performance slowdowns | P95 increased from 250ms to 900ms |
-| 4xx / 5xx error tracking | Detect client/server issues | 5xx spike after deployment |
-| SLA compliance monitoring | Ensure performance guarantees | SLA <500ms dropped to 91% |
-| Slow endpoint identification | Optimize problematic routes | /checkout consistently >1200ms |
-| Anomaly detection | Detect abnormal patterns | Latency z-score > 3 |
-| Executive KPI visibility | High-level monitoring view | Daily requests and error rate trend |
+* Python
+* FastAPI
+* Docker & Docker Compose
+* Google Cloud Logging
+* BigQuery
+* SQLite
+* SQL analytics (window functions)
+* Grafana
+* Looker Studio
 
 ---
 
-## 4. Pipeline Architecture
-```
-Cloud Logging / JSON / CSV  
-            ↓  
-      Extract Logs  
-            ↓  
-     Schema Normalization  
-            ↓  
-   Unified Requests Table  
-            ↓  
-   BigQuery / SQLite Load  
-            ↓  
-      Metrics Generation  
-            ↓  
-     SQL Views / Tables  
-            ↓  
-   Looker Studio / Grafana
-```
----
+## 📂 Project Structure
 
-## 5. Analytics & Metrics Layer
-
-The project uses advanced SQL analytics functions and materialized metrics tables.
-
-### SQL Analytical Techniques
-
-| Technique | Purpose | Example |
-|------------|---------|----------|
-| Window Functions (OVER) | Compute metrics over partitions | AVG(latency_ms) OVER(PARTITION BY api_path) |
-| ROW_NUMBER | Rank events chronologically | ROW_NUMBER() OVER(PARTITION BY api_path ORDER BY latency_ms DESC) |
-| RANK / DENSE_RANK | Identify top slow endpoints | RANK() OVER(PARTITION BY day ORDER BY p95_latency DESC) |
-| LAG / LEAD | Compare with previous values | latency_ms - LAG(latency_ms) OVER(...) |
-| Rolling Average | Smooth time series | AVG(latency_ms) OVER(ORDER BY hour ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) |
-| Rolling Error Rate | Detect spikes | SUM(total_5xx) OVER(1h_window) |
-| Z-Score | Detect anomalies statistically | (value - mean) / stddev |
-
-### Generated Metrics Tables
-
-| Table | Purpose | Example Usage |
-|--------|----------|---------------|
-| dashboard_latency_hourly | Hourly latency aggregation | Trend chart in Grafana |
-| dashboard_errors_hourly | Hourly error metrics | Error rate time series |
-| dashboard_status_codes_daily | Daily status distribution | Pie chart of 2xx/4xx/5xx |
-| dashboard_sla_daily | SLA compliance tracking | SLA KPI card |
-| dashboard_anomaly_latency_zscore | Latency anomaly detection | Alert trigger |
-| dashboard_anomaly_error_spikes | Error spike detection | Incident investigation |
-| dashboard_endpoint_degradation_daily
-
----
-
-## 6. Project Structure
 ```
 monitoring-api-analytics/
 ├── main.py                               ## Application entry point (FastAPI bootstrap, CLI execution, healthcheck)
@@ -186,27 +99,172 @@ monitoring-api-analytics/
         ├── load.py                       ## Data loading into BigQuery or SQLite
         └── metrics.py                    ## Dashboard metrics materialization and SQL execution
 ```
+
 ---
 
-## 7. Prerequisites
+## ❓ Problem Statement
 
-- Python 3.10+
-- Docker & Docker Compose
-- Optional GPU (for BiLSTM)
+Modern API infrastructures generate logs across multiple environments:
 
-### Ubuntu Example
+* Cloud Run services
+* Kubernetes workloads
+* Local JSON / JSONL / CSV exports
 
-```bash
-sudo apt update
-sudo apt install python python3-pip
-python --version
+Key challenges include:
+
+* inconsistent log schemas
+* missing fields across environments
+* latency measurement inconsistencies
+* error rate aggregation
+* SLA monitoring
+* anomaly detection
+
+This project addresses these issues through:
+
+* unified schema normalization
+* fallback values for missing fields
+* SQL-based analytics layer
+* window functions for advanced metrics
+* reproducible dashboard datasets
+
+---
+
+## 🧠 Approach / Methodology / Strategy
+
+The platform transforms heterogeneous logs into **structured monitoring analytics**.
+
+Core principles:
+
+* **Unified schema normalization** for heterogeneous logs
+* **SQL-driven analytics layer**
+* **Latency and error monitoring metrics**
+* **Reproducible dashboard datasets**
+
+### Monitoring Ecosystem
+
+| Component             | Role                                            |
+| --------------------- | ----------------------------------------------- |
+| Log Extraction        | Retrieve logs from Cloud Logging or local files |
+| Schema Normalization  | Convert logs to unified schema                  |
+| Metrics Generation    | Compute monitoring metrics                      |
+| SQL Analytics         | Window functions and statistical calculations   |
+| Dashboard Integration | Grafana and Looker Studio visualization         |
+
+### Observability Dimensions
+
+| Dimension       | Description                   |
+| --------------- | ----------------------------- |
+| event_timestamp | Timestamp of API request      |
+| service         | Microservice handling request |
+| api_path        | Endpoint path                 |
+| http_method     | HTTP method                   |
+| status_code     | HTTP response code            |
+| latency_ms      | Request execution time        |
+| user_uid        | Unique user identifier        |
+| env             | Deployment environment        |
+
+### SQL Analytical Techniques
+
+| Technique | Purpose | Example |
+|------------|---------|----------|
+| Window Functions (OVER) | Compute metrics over partitions | AVG(latency_ms) OVER(PARTITION BY api_path) |
+| ROW_NUMBER | Rank events chronologically | ROW_NUMBER() OVER(PARTITION BY api_path ORDER BY latency_ms DESC) |
+| RANK / DENSE_RANK | Identify top slow endpoints | RANK() OVER(PARTITION BY day ORDER BY p95_latency DESC) |
+| LAG / LEAD | Compare with previous values | latency_ms - LAG(latency_ms) OVER(...) |
+| Rolling Average | Smooth time series | AVG(latency_ms) OVER(ORDER BY hour ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) |
+| Rolling Error Rate | Detect spikes | SUM(total_5xx) OVER(1h_window) |
+| Z-Score | Detect anomalies statistically | (value - mean) / stddev |
+
+### Generated Metrics Tables
+
+| Table | Purpose | Example Usage |
+|--------|----------|---------------|
+| dashboard_latency_hourly | Hourly latency aggregation | Trend chart in Grafana |
+| dashboard_errors_hourly | Hourly error metrics | Error rate time series |
+| dashboard_status_codes_daily | Daily status distribution | Pie chart of 2xx/4xx/5xx |
+| dashboard_sla_daily | SLA compliance tracking | SLA KPI card |
+| dashboard_anomaly_latency_zscore | Latency anomaly detection | Alert trigger |
+| dashboard_anomaly_error_spikes | Error spike detection | Incident investigation |
+| dashboard_endpoint_degradation_daily
+
+---
+
+## 🏗 Pipeline Architecture
+
+```
+Cloud Logging / JSON / CSV
+            ↓
+      Extract Logs
+            ↓
+     Schema Normalization
+            ↓
+   Unified Requests Table
+            ↓
+   BigQuery / SQLite Load
+            ↓
+      Metrics Generation
+            ↓
+     SQL Views / Tables
+            ↓
+   Looker Studio / Grafana
 ```
 
 ---
 
-## 8. Setup
+## 📊 Exploratory Data Analysis
 
-### Python
+The project provides analytical tools to explore monitoring datasets:
+
+* latency distribution analysis
+* error rate diagnostics
+* SLA compliance analysis
+* anomaly detection via statistical metrics
+
+Generated outputs can be exported to:
+
+```
+artifacts/exports/
+```
+
+---
+
+## 🔧 Setup & Installation
+
+In this section we explain the minimum OS verification, python usage and docker setup.
+
+### 1. Requirements
+
+* Python 3.10+
+* Docker & Docker Compose
+* Google Cloud credentials (optional)
+
+### 2. OS prerequists
+
+Verify that you have the necessairy packages installed.
+
+#### Windows / WSL2 (recommended)
+
+```bash
+# PowerShell
+wsl --status
+wsl --install
+wsl --list --online
+wsl --install -d Ubuntu
+wsl -d Ubuntu
+
+docker --version
+docker compose version
+```
+
+#### Ubuntu
+
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip build-essential curl git
+python3 --version
+```
+
+### 3. Python environment
 
 ```bash
 python -m venv .monitor_env
@@ -215,16 +273,17 @@ python -m pip install --upgrade pip setuptools wheel		## for windows : .monitor_
 pip install -r requirements.txt
 ```
 
-### Docker
+### 4. Docker setup
 
-```
-docker compose build
-docker compose up
+```bash
+docker compose -f docker/docker-compose.yml build
+docker compose -f docker/docker-compose.yml up
 ```
 
 ---
 
-## 9. Full System Verification
+## ▶️ Usage & End-to-End Testing
+
 ```bash
 ## Run full ETL pipeline (extract logs from Cloud Logging, transform, and load into BigQuery)
 python main.py --extract-transform-load --source cloud --target bigquery --filter-query "resource.type=\"cloud_run_revision\"" --limit 100
@@ -238,25 +297,23 @@ python main.py --run-api
 ## Run full test suite quietly (pytest)
 pytest -q
 ```
----
-
-## 10. Dashboard Integration
-
-### Looker Studio
-
-- Connect BigQuery dataset
-- Use tables under dashboard_*
-
-### Grafana
-
-- Import grafana_monitoring_api_analytics.json
-- Configure BigQuery datasource
 
 ---
 
-## Author
+## 📛 Common Errors & Troubleshooting
 
-**Georges Nassopoulos**  
-Email: georges.nassopoulos@gmail.com
+| Error                                | Cause                           | Solution                   |
+| ------------------------------------ | ------------------------------- | -------------------------- |
+| Cloud Logging authentication failure | Missing GCP credentials         | Configure service account  |
+| BigQuery connection error            | Incorrect dataset configuration | Check `.env` variables     |
+| Schema mismatch                      | Unexpected log structure        | Update normalization logic |
+| Docker container startup failure     | Environment misconfiguration    | Rebuild containers         |
 
+---
 
+## 👤 Author
+
+**Georges Nassopoulos**
+[georges.nassopoulos@gmail.com](mailto:georges.nassopoulos@gmail.com)
+
+**Status:** AI Engineering / Cloud Infrastructure Project
