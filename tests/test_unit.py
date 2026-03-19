@@ -9,6 +9,7 @@ __desc__ = "Unit tests for ETL normalization and load layers (pytest)."
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import pandas as pd
@@ -88,6 +89,33 @@ def raw_http_request_record() -> dict:
             "latency": 123,
         },
     }
+
+## ============================================================
+## TEST HELPERS
+## ============================================================
+def _count_rows_in_table(sqlite_path: Path, table_name: str) -> int:
+    """
+        Count rows in a sqlite table
+
+        High-level workflow:
+            1) Open sqlite connection
+            2) Execute count query
+            3) Return row count
+
+        Args:
+            sqlite_path: Path to sqlite database
+            table_name: Target table name
+
+        Returns:
+            Number of rows in table
+    """
+
+    with sqlite3.connect(sqlite_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+        row_count = cursor.fetchone()[0]
+
+    return int(row_count)
 
 ## ============================================================
 ## NORMALIZATION TESTS
@@ -200,6 +228,19 @@ def test_normalize_logs_returns_expected_columns(
     ## Validate schema columns
     assert expected_cols.issubset(set(df.columns))
 
+def test_normalize_logs_empty_input() -> None:
+    """
+        Ensure normalization handles empty input
+
+        Returns:
+            None
+    """
+
+    df = normalize_logs([])
+
+    assert isinstance(df, pd.DataFrame)
+    assert df.empty
+
 ## ============================================================
 ## SQLITE LOAD TESTS
 ## ============================================================
@@ -214,6 +255,7 @@ def test_load_to_sqlite_creates_db_and_table(
             1) Normalize minimal record
             2) Load dataset into sqlite
             3) Verify sqlite file exists and is non-empty
+            4) Verify inserted row count with SQL
 
         Args:
             tmp_sqlite_path: Temporary sqlite database path
@@ -234,6 +276,14 @@ def test_load_to_sqlite_creates_db_and_table(
     assert tmp_sqlite_path.exists()
     assert tmp_sqlite_path.stat().st_size > 0
 
+    ## Validate inserted row count with SQL
+    row_count = _count_rows_in_table(
+        sqlite_path=tmp_sqlite_path,
+        table_name="normalized_requests",
+    )
+
+    assert row_count == 1
+
 def test_load_to_sqlite_appends_rows(
     tmp_sqlite_path: Path,
     raw_minimal_record: dict,
@@ -245,6 +295,7 @@ def test_load_to_sqlite_appends_rows(
             1) Normalize same record twice
             2) Load twice using append mode
             3) Verify sqlite file exists and remains non-empty
+            4) Verify final row count with SQL
 
         Args:
             tmp_sqlite_path: Temporary sqlite database path
@@ -270,3 +321,101 @@ def test_load_to_sqlite_appends_rows(
     ## Validate sqlite file created
     assert tmp_sqlite_path.exists()
     assert tmp_sqlite_path.stat().st_size > 0
+
+    ## Validate appended row count with SQL
+    row_count = _count_rows_in_table(
+        sqlite_path=tmp_sqlite_path,
+        table_name="normalized_requests",
+    )
+
+    assert row_count == 2
+
+def test_load_to_sqlite_empty_dataframe(tmp_sqlite_path: Path) -> None:
+    """
+        Ensure sqlite loader handles empty dataframe
+
+        High-level workflow:
+            1) Create empty DataFrame
+            2) Load it into sqlite
+            3) Verify database file behavior stays controlled
+
+        Args:
+            tmp_sqlite_path: Temporary sqlite database path
+
+        Returns:
+            None
+    """
+
+    df = pd.DataFrame()
+
+    load_to_sqlite(
+        df=df,
+        sqlite_path=tmp_sqlite_path,
+        table_name="normalized_requests",
+    )
+
+    assert tmp_sqlite_path.exists()
+
+def test_load_to_sqlite_empty_dataframe_row_count_zero(
+    tmp_sqlite_path: Path,
+) -> None:
+    """
+        Ensure empty dataframe does not insert rows when table exists
+
+        High-level workflow:
+            1) Insert one normalized row to create table
+            2) Load empty DataFrame
+            3) Verify row count is unchanged
+
+        Args:
+            tmp_sqlite_path: Temporary sqlite database path
+
+        Returns:
+            None
+    """
+
+    ## Create initial table with one row
+    seed_df = pd.DataFrame(
+        [
+            {
+                "event_timestamp": "2026-02-17T10:00:00",
+                "env": "dev",
+                "service": "api-service",
+                "version": "1.0.0",
+                "api_name": "test-api",
+                "api_method": "GET",
+                "api_path": "/v1/test",
+                "request_method": "GET",
+                "request_url": "/v1/test",
+                "status_code": 200,
+                "latency_ms": 100,
+                "remote_ip": "10.0.0.1",
+                "user_agent": "pytest",
+                "user_uid": "user-1",
+                "trace": "trace-1",
+                "payload_size": 123,
+            }
+        ]
+    )
+
+    load_to_sqlite(
+        df=seed_df,
+        sqlite_path=tmp_sqlite_path,
+        table_name="normalized_requests",
+    )
+
+    ## Load empty DataFrame after table creation
+    empty_df = pd.DataFrame()
+    load_to_sqlite(
+        df=empty_df,
+        sqlite_path=tmp_sqlite_path,
+        table_name="normalized_requests",
+    )
+
+    ## Validate row count unchanged
+    row_count = _count_rows_in_table(
+        sqlite_path=tmp_sqlite_path,
+        table_name="normalized_requests",
+    )
+
+    assert row_count == 1
