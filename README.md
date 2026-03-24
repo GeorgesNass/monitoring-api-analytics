@@ -79,7 +79,6 @@ monitoring-api-analytics/
 │
 └── src/
     ├── pipeline.py                       ## End-to-end orchestration (extract → transform → load → metrics)
-    ├── __init__.py
     │
     ├── utils/
     │   ├── logging_utils.py              ## Centralized structured logging utilities
@@ -87,6 +86,8 @@ monitoring-api-analytics/
     │   └── loader_utils.py               ## Safe JSON / JSONL / CSV loading helpers
     │
     ├── core/
+    │   ├── auth.py                    	  ## JWT auth: tokens, login, refresh, dependencies
+    │   ├── security.py                	  ## RBAC, middleware, permissions, request security		
     │   ├── service.py                    ## FastAPI routes and API exposure
     │   ├── schema.py                     ## Pydantic request/response models
     │   ├── config.py                     ## Environment variable management and path resolution
