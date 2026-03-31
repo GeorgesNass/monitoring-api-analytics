@@ -72,6 +72,69 @@ SUPPORTED_INPUT_EXTENSIONS = (".csv", ".json", ".jsonl", ".txt", ".parquet")
 SUPPORTED_OUTPUT_EXTENSIONS = (".csv", ".json", ".jsonl", ".db")
 
 ## ============================================================
+## GCP JSON LOADING
+## ============================================================
+
+def _read_json_secret(path: Path) -> dict[str, Any]:
+    """
+        Read a JSON secret file from disk
+
+        Args:
+            path: Path to JSON file
+
+        Returns:
+            Parsed JSON as dictionary
+
+        Raises:
+            FileNotFoundError: If file does not exist
+            ValueError: If JSON is invalid
+    """
+
+    ## Ensure file exists
+    if not path.exists():
+        raise FileNotFoundError(f"Missing JSON secret file: {path}")
+
+    ## Load JSON content
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as exc:
+        raise ValueError(f"Invalid JSON content in {path}: {exc}") from exc
+
+
+## ============================================================
+## GCP CONFIG RESOLUTION
+## ============================================================
+def _load_gcp_config(project_root: Path) -> GcpConfig:
+    """
+        Load GCP configuration from JSON secret file
+
+        Args:
+            project_root: Project root directory
+
+        Returns:
+            GcpConfig instance populated from JSON
+
+        Raises:
+            FileNotFoundError: If config file is missing
+            ValueError: If JSON content is invalid
+    """
+
+    ## Resolve path from environment
+    raw_path = _get_env("GCP_CONFIG_FILE", "")
+    resolved_path = _resolve_path(raw_path, project_root=project_root)
+
+    ## Load JSON config
+    gcp_json = _read_json_secret(resolved_path) if resolved_path else {}
+
+    ## Build config object
+    return GcpConfig(
+        project_id=gcp_json.get("project_id", ""),
+        bigquery_dataset=gcp_json.get("bigquery_dataset", ""),
+        bigquery_table=gcp_json.get("bigquery_table", ""),
+    )
+    
+## ============================================================
 ## CONFIG MODELS
 ## ============================================================
 @dataclass(frozen=True)
@@ -730,9 +793,7 @@ def get_config() -> AppConfig:
     profile = _get_env("PROFILE", DEFAULT_PROFILE).lower()
 
     ## Sanitize raw GCP-related values
-    project_id = _sanitize_placeholder(_get_env("GCP_PROJECT_ID", ""), "GCP_PROJECT_ID") or ""
-    bigquery_dataset = _sanitize_placeholder(_get_env("BQ_DATASET", ""), "BQ_DATASET") or ""
-    bigquery_table = _sanitize_placeholder(_get_env("BQ_TABLE", ""), "BQ_TABLE") or ""
+    gcp = _load_gcp_config(project_root=project_root)
     google_credentials_raw = _sanitize_placeholder(_get_env("GOOGLE_APPLICATION_CREDENTIALS", ""), "GOOGLE_APPLICATION_CREDENTIALS")
 
     ## Validate placeholder values for non-sanitized secrets
@@ -787,12 +848,12 @@ def get_config() -> AppConfig:
 
     ## Build GCP / BigQuery section
     gcp = GcpConfig(
-        project_id=project_id,
-        bigquery_dataset=bigquery_dataset,
-        bigquery_table=bigquery_table,
+        project_id=gcp.project_id,
+        bigquery_dataset=gcp.bigquery_dataset,
+        bigquery_table=gcp.bigquery_table,
         bigquery_location=_get_profiled_env("BQ_LOCATION", DEFAULT_BQ_LOCATION, profile),
     )
-
+    
     ## Resolve optional secrets
     secrets = SecretsConfig(
         api_key=_read_secret_value("API_KEY", "API_KEY_FILE", project_root=project_root),
