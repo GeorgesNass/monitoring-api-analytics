@@ -27,6 +27,7 @@ from src.core.schema import (
     PipelineRequest,
     GenericResponse,
 )
+from src.core.data_consistency import run_data_consistency
 from src.core.errors import MonitoringBaseError
 from src.pipeline import run_pipeline
 from src.utils.logging_utils import get_logger
@@ -174,6 +175,40 @@ def register_routes(app: FastAPI) -> None:
         """
 
         try:
+            
+            ## ============================================================
+            ## DATA CONSISTENCY CHECK
+            ## ============================================================
+
+            ## Build monitoring payload
+            data = {
+                "endpoint": request.source,
+                "target": request.target,
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+            ## Run consistency
+            consistency_result = run_data_consistency(
+                data=data,
+                strict=settings.data_consistency.strict_mode,
+            )
+
+            ## Log result
+            logger.info(f"Consistency OK: {consistency_result['is_consistent']}")
+
+            ## Block if needed
+            if not consistency_result["is_consistent"]:
+                logger.warning(f"Issues detected: {consistency_result['issues']}")
+
+                if settings.data_consistency.strict_mode:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Data consistency check failed",
+                    )
+
+            if not consistency_result["is_consistent"] and not settings.data_consistency.allow_warnings:
+                raise HTTPException(status_code=400, detail="Data consistency warnings not allowed")
+    
             ## Run monitoring pipeline
             run_pipeline(
                 source=request.source,

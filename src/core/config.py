@@ -251,6 +251,24 @@ class SecretsConfig:
     google_credentials_json: str
 
 @dataclass(frozen=True)
+class DataConsistencyConfig:
+    """
+        Data consistency configuration
+
+        Args:
+            enabled: Enable consistency checks
+            strict_mode: Raise errors if inconsistencies
+            max_error_ratio: Max allowed error ratio
+            allow_warnings: Allow warnings without failing
+    """
+
+    enabled: bool
+    strict_mode: bool
+    max_error_ratio: float
+    allow_warnings: bool
+
+
+@dataclass(frozen=True)
 class AppConfig:
     """
         Unified application configuration
@@ -272,7 +290,8 @@ class AppConfig:
     runtime: RuntimeConfig
     gcp: GcpConfig
     secrets: SecretsConfig
-
+    data_consistency: DataConsistencyConfig
+        
 ## ============================================================
 ## DOTENV / ENV HELPERS
 ## ============================================================
@@ -719,6 +738,14 @@ def _validate_config(config: AppConfig) -> None:
     if config.paths.local_sqlite_path.suffix.lower() not in {".db", ".sqlite", ".sqlite3"}:
         raise ConfigurationError("SQLITE_DB_PATH must point to a SQLite database file")
 
+    ## Validate data consistency config
+    if not (0.0 <= config.data_consistency.max_error_ratio <= 1.0):
+        raise ConfigurationError("DATA_CONSISTENCY_MAX_ERROR_RATIO must be between 0 and 1")
+  
+    ## Validate strict_mode logic
+    if config.data_consistency.strict_mode and not config.data_consistency.enabled:
+        raise ConfigurationError("DATA_CONSISTENCY_STRICT requires DATA_CONSISTENCY_ENABLED=True")
+        
     ## Validate production constraints
     _validate_environment(config)
 
@@ -846,6 +873,14 @@ def get_config() -> AppConfig:
         allowed_origins=_get_env_list("ALLOWED_ORIGINS", ["*"]),
     )
 
+    ## Build data consistency config
+    data_consistency = DataConsistencyConfig(
+        enabled=_get_profiled_env_bool("DATA_CONSISTENCY_ENABLED", True, profile),
+        strict_mode=_get_profiled_env_bool("DATA_CONSISTENCY_STRICT", False, profile),
+        max_error_ratio=_get_profiled_env_float("DATA_CONSISTENCY_MAX_ERROR_RATIO", 0.1, profile),
+        allow_warnings=_get_profiled_env_bool("DATA_CONSISTENCY_ALLOW_WARNINGS", True, profile),
+    )
+    
     ## Build GCP / BigQuery section
     gcp = GcpConfig(
         project_id=gcp.project_id,
@@ -869,6 +904,7 @@ def get_config() -> AppConfig:
         runtime=runtime,
         gcp=gcp,
         secrets=secrets,
+        data_consistency=data_consistency,
     )
 
     ## Validate final configuration

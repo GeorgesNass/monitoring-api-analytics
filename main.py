@@ -18,6 +18,7 @@ from typing import Optional
 import uvicorn
 
 from src.core.config import settings
+from src.core.data_consistency import run_data_consistency
 from src.core.errors import (
     ConfigurationError,
     ExtractionError,
@@ -153,6 +154,26 @@ def main() -> int:
         ## METRICS ONLY
         if args.build_metrics_only:
             logger.info("Building metrics | target=%s", args.target)
+            
+            ## ============================================================
+            ## DATA CONSISTENCY CHECK
+            ## ============================================================
+
+            data = {
+                "target": args.target,
+                "timestamp": time.time(),
+            }
+
+            consistency_result = run_data_consistency(
+                data=data,
+                strict=settings.data_consistency.strict_mode,
+            )
+
+            logger.info(f"Consistency OK: {consistency_result['is_consistent']}")
+
+            if not consistency_result["is_consistent"] and settings.data_consistency.strict_mode:
+                raise ConfigurationError("Data consistency failed before metrics")
+                
             build_metrics(target=args.target)
             logger.info("Metrics build completed")
 
@@ -172,6 +193,30 @@ def main() -> int:
                 args.target,
                 int(args.limit),
             )
+
+            ## ============================================================
+            ## DATA CONSISTENCY CHECK
+            ## ============================================================
+
+            data = {
+                "source": args.source,
+                "target": args.target,
+                "file_path": str(file_path) if file_path else None,
+                "limit": int(args.limit),
+            }
+
+            consistency_result = run_data_consistency(
+                data=data,
+                strict=settings.data_consistency.strict_mode,
+            )
+
+            logger.info(f"Consistency OK: {consistency_result['is_consistent']}")
+
+            if not consistency_result["is_consistent"]:
+                logger.warning(f"Issues detected: {consistency_result['issues']}")
+
+                if settings.data_consistency.strict_mode:
+                    raise ConfigurationError("Data consistency failed before pipeline")
 
             run_pipeline(
                 source=args.source,
@@ -194,6 +239,23 @@ def main() -> int:
                 reload_mode,
             )
 
+            ## ============================================================
+            ## DATA CONSISTENCY CHECK
+            ## ============================================================
+
+            data = {
+                "host": args.host,
+                "port": int(args.port),
+                "mode": "api",
+            }
+
+            consistency_result = run_data_consistency(
+                data=data,
+                strict=False,
+            )
+
+            logger.info(f"Consistency OK: {consistency_result['is_consistent']}")
+            
             uvicorn.run(
                 "src.core.service:app",
                 host=args.host,

@@ -15,6 +15,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+from src.core.data_consistency import run_data_consistency
 from src.etl.load import load_to_sqlite
 from src.etl.transform import normalize_logs
 
@@ -419,3 +420,92 @@ def test_load_to_sqlite_empty_dataframe_row_count_zero(
     )
 
     assert row_count == 1
+
+## ============================================================
+## DATA CONSISTENCY TESTS
+## ============================================================
+def test_data_consistency_valid_monitoring():
+    """
+        Validate correct monitoring payload
+    """
+
+    data = {
+        "timestamp": "2026-02-17T10:00:00",
+        "endpoint": "/api/test",
+        "status_code": 200,
+        "latency": 120,
+        "total_requests": 100,
+        "success_requests": 90,
+        "success_rate": 0.9,
+    }
+
+    result = run_data_consistency(data=data)
+
+    assert result["is_consistent"] is True
+    assert result["errors"] == 0
+
+def test_data_consistency_invalid_latency():
+    """
+        Detect negative latency
+    """
+
+    data = {
+        "timestamp": "2026-02-17T10:00:00",
+        "endpoint": "/api/test",
+        "status_code": 200,
+        "latency": -5,
+    }
+
+    result = run_data_consistency(data=data)
+
+    assert result["is_consistent"] is False
+    assert result["errors"] > 0
+
+def test_data_consistency_invalid_success_rate():
+    """
+        Detect invalid success_rate
+    """
+
+    data = {
+        "timestamp": "2026-02-17T10:00:00",
+        "endpoint": "/api/test",
+        "status_code": 200,
+        "success_rate": 1.5,
+    }
+
+    result = run_data_consistency(data=data)
+
+    assert result["is_consistent"] is False
+
+def test_data_consistency_cross_metrics():
+    """
+        Detect mismatch between computed and reported success_rate
+    """
+
+    data = {
+        "timestamp": "2026-02-17T10:00:00",
+        "endpoint": "/api/test",
+        "status_code": 200,
+        "total_requests": 100,
+        "success_requests": 50,
+        "success_rate": 0.9,
+    }
+
+    result = run_data_consistency(data=data)
+
+    assert result["warnings"] > 0
+
+def test_data_consistency_api_payload():
+    """
+        Validate API payload consistency
+    """
+
+    data = {
+        "host": "0.0.0.0",
+        "port": 8000,
+        "mode": "api",
+    }
+
+    result = run_data_consistency(data=data)
+
+    assert "is_consistent" in result
