@@ -16,6 +16,7 @@ import pandas as pd
 import pytest
 
 from src.core.data_consistency import run_data_consistency
+from src.core.data_quality import run_data_quality
 from src.etl.load import load_to_sqlite
 from src.etl.transform import normalize_logs
 
@@ -509,3 +510,60 @@ def test_data_consistency_api_payload():
     result = run_data_consistency(data=data)
 
     assert "is_consistent" in result
+    
+## ============================================================
+## DATA QUALITY TESTS
+## ============================================================
+def test_data_quality_valid():
+    """
+        Validate normal monitoring metrics
+    """
+
+    data = {
+        "latency": 120,
+        "requests": 100,
+    }
+
+    result = run_data_quality(data=data)
+
+    assert result["is_valid"] is True
+    assert result["errors"] == 0
+
+def test_data_quality_outlier():
+    """
+        Detect anomaly in metrics
+    """
+
+    data = {
+        "latency": 100,
+        "requests": 999999,  ## anomaly
+    }
+
+    result = run_data_quality(data=data)
+
+    assert result["warnings"] > 0
+
+def test_data_quality_invalid():
+    """
+        Detect invalid values
+    """
+
+    data = {
+        "latency": float("nan"),
+    }
+
+    result = run_data_quality(data=data)
+
+    assert result["errors"] > 0
+
+def test_data_quality_strict():
+    """
+        Strict mode should fail
+    """
+
+    data = {
+        "latency": float("nan"),
+    }
+
+    with pytest.raises(Exception):
+        run_data_quality(data=data, strict=True)

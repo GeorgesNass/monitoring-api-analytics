@@ -6,9 +6,9 @@
 # Version: 1.0.0
 # Description:
 #   CLI menu to run the monitoring-api-analytics workflows:
-#   - run full pipeline (extract -> transform -> load -> metrics) (with data consistency)
-#   - build metrics only (BigQuery views/tables or SQLite dashboard tables) (with data consistency)
-#   - run FastAPI service (with data consistency)
+#   - run full pipeline (extract -> transform -> load -> metrics) (with data consistency + data quality)
+#   - build metrics only (BigQuery views/tables or SQLite dashboard tables) (with data consistency + data quality)
+#   - run FastAPI service (with data consistency + data quality)
 #   - run tests (pytest)
 ###############################################################################
 
@@ -44,9 +44,9 @@ run_python() {
 while true; do
   echo ""
   echo "Select an action:"
-  echo " 1) Run full pipeline (extract -> transform -> load -> metrics) (with data consistency)"
-  echo " 2) Build metrics only (deploy SQL assets / materialize dashboard tables) (with data consistency)"
-  echo " 3) Run API (uvicorn) (with data consistency)"
+  echo " 1) Run full pipeline (extract -> transform -> load -> metrics) (with data consistency + data quality)"
+  echo " 2) Build metrics only (deploy SQL assets / materialize dashboard tables) (with data consistency + data quality)"
+  echo " 3) Run API (uvicorn) (with data consistency + data quality)"
   echo " 4) Run tests (pytest)"
   echo " 0) Exit"
   echo ""

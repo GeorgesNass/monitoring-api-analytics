@@ -19,6 +19,7 @@ import uvicorn
 
 from src.core.config import settings
 from src.core.data_consistency import run_data_consistency
+from src.core.data_quality import run_data_quality
 from src.core.errors import (
     ConfigurationError,
     ExtractionError,
@@ -155,10 +156,7 @@ def main() -> int:
         if args.build_metrics_only:
             logger.info("Building metrics | target=%s", args.target)
             
-            ## ============================================================
             ## DATA CONSISTENCY CHECK
-            ## ============================================================
-
             data = {
                 "target": args.target,
                 "timestamp": time.time(),
@@ -173,6 +171,22 @@ def main() -> int:
 
             if not consistency_result["is_consistent"] and settings.data_consistency.strict_mode:
                 raise ConfigurationError("Data consistency failed before metrics")
+
+            ## DATA QUALITY CHECK (déplacé AVANT execution)
+            if settings.runtime.anomaly_detection_enabled:
+
+                quality_result = run_data_quality(
+                    data=data,
+                    method=settings.runtime.anomaly_method,
+                    z_threshold=settings.runtime.z_threshold,
+                    iqr_multiplier=settings.runtime.iqr_multiplier,
+                    strict=settings.runtime.anomaly_strict_mode,
+                )
+
+                logger.info(f"Quality score: {quality_result['score']}")
+
+                if quality_result["errors"] > 0:
+                    raise ConfigurationError("Data quality failed before metrics")
                 
             build_metrics(target=args.target)
             logger.info("Metrics build completed")
@@ -194,10 +208,7 @@ def main() -> int:
                 int(args.limit),
             )
 
-            ## ============================================================
             ## DATA CONSISTENCY CHECK
-            ## ============================================================
-
             data = {
                 "source": args.source,
                 "target": args.target,
@@ -217,6 +228,22 @@ def main() -> int:
 
                 if settings.data_consistency.strict_mode:
                     raise ConfigurationError("Data consistency failed before pipeline")
+
+            ## DATA QUALITY CHECK (déplacé AVANT execution)
+            if settings.runtime.anomaly_detection_enabled:
+
+                quality_result = run_data_quality(
+                    data=data,
+                    method=settings.runtime.anomaly_method,
+                    z_threshold=settings.runtime.z_threshold,
+                    iqr_multiplier=settings.runtime.iqr_multiplier,
+                    strict=settings.runtime.anomaly_strict_mode,
+                )
+
+                logger.info(f"Quality score: {quality_result['score']}")
+
+                if quality_result["errors"] > 0:
+                    raise ConfigurationError("Data quality failed before pipeline")
 
             run_pipeline(
                 source=args.source,
@@ -239,10 +266,7 @@ def main() -> int:
                 reload_mode,
             )
 
-            ## ============================================================
             ## DATA CONSISTENCY CHECK
-            ## ============================================================
-
             data = {
                 "host": args.host,
                 "port": int(args.port),
@@ -255,7 +279,23 @@ def main() -> int:
             )
 
             logger.info(f"Consistency OK: {consistency_result['is_consistent']}")
-            
+   
+            ## DATA QUALITY CHECK
+            if settings.runtime.anomaly_detection_enabled:
+
+                quality_result = run_data_quality(
+                    data=data,
+                    method=settings.runtime.anomaly_method,
+                    z_threshold=settings.runtime.z_threshold,
+                    iqr_multiplier=settings.runtime.iqr_multiplier,
+                    strict=False,
+                )
+
+                logger.info(f"Quality score: {quality_result['score']}")
+
+                if quality_result["errors"] > 0:
+                    raise ConfigurationError("Data quality failed before API startup")
+                    
             uvicorn.run(
                 "src.core.service:app",
                 host=args.host,

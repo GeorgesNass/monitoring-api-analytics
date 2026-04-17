@@ -206,6 +206,12 @@ class RuntimeConfig:
             request_timeout_seconds: Request timeout
             batch_sleep_seconds: Sleep delay between batches
             allowed_origins: Allowed HTTP origins for future API usage
+            anomaly_detection_enabled: Enable anomaly detection
+            anomaly_method: Detection method (zscore / iqr)
+            z_threshold: Z-score threshold
+            iqr_multiplier: IQR multiplier
+            anomaly_strict_mode: Strict validation mode
+            monitoring_streaming_enabled: Enable streaming-oriented monitoring checks            
     """
 
     environment: str
@@ -219,6 +225,12 @@ class RuntimeConfig:
     request_timeout_seconds: int
     batch_sleep_seconds: float
     allowed_origins: list[str]
+    anomaly_detection_enabled: bool
+    anomaly_method: str
+    z_threshold: float
+    iqr_multiplier: float
+    anomaly_strict_mode: bool
+    monitoring_streaming_enabled: bool
 
 @dataclass(frozen=True)
 class GcpConfig:
@@ -440,17 +452,23 @@ def _get_env_float(name: str, default: float) -> float:
 
         Returns:
             Parsed float value
-
-        Raises:
-            ConfigurationError: If the value is invalid
     """
 
-    ## Parse float strictly
-    try:
-        return float(_get_env(name, str(default)))
-    except (TypeError, ValueError) as exc:
-        raise ConfigurationError(f"{name} must be a float") from exc
+    raw = None
 
+    try:
+        ## read raw value
+        raw = _get_env(name, str(default))
+
+        ## convert to float
+        value = float(raw)
+
+        return value
+
+    except (TypeError, ValueError) as exc:
+        logger.error(f"Invalid float value for {name}: {raw}")
+        raise ConfigurationError(f"{name} must be a float") from exc
+        
 def _get_env_list(name: str, default: Optional[list[str]] = None, *, separator: str = ",") -> list[str]:
     """
         Parse a list-like environment variable
@@ -749,6 +767,16 @@ def _validate_config(config: AppConfig) -> None:
     ## Validate production constraints
     _validate_environment(config)
 
+    ## validate anomaly config
+    if config.runtime.z_threshold <= 0:
+        raise ConfigurationError("Z_THRESHOLD must be > 0")
+
+    if config.runtime.iqr_multiplier <= 0:
+        raise ConfigurationError("IQR_MULTIPLIER must be > 0")
+
+    if config.runtime.anomaly_method not in {"zscore", "iqr"}:
+        raise ConfigurationError("ANOMALY_METHOD must be 'zscore' or 'iqr'")
+        
 ## ============================================================
 ## EXPORT HELPERS
 ## ============================================================
@@ -871,6 +899,12 @@ def get_config() -> AppConfig:
         request_timeout_seconds=_get_profiled_env_int("REQUEST_TIMEOUT_SECONDS", DEFAULT_REQUEST_TIMEOUT_SECONDS, profile),
         batch_sleep_seconds=_get_profiled_env_float("BATCH_SLEEP_SECONDS", 0.0, profile),
         allowed_origins=_get_env_list("ALLOWED_ORIGINS", ["*"]),
+        anomaly_detection_enabled=_get_env_bool("ANOMALY_DETECTION_ENABLED", True),
+        anomaly_method=_get_env("ANOMALY_METHOD", "zscore"),
+        z_threshold=_get_env_float("Z_THRESHOLD", 3.0),
+        iqr_multiplier=_get_env_float("IQR_MULTIPLIER", 1.5),
+        anomaly_strict_mode=_get_env_bool("ANOMALY_STRICT_MODE", False),
+        monitoring_streaming_enabled=_get_env_bool("MONITORING_STREAMING_ENABLED", True),
     )
 
     ## Build data consistency config
