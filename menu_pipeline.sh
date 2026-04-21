@@ -3,13 +3,14 @@
 ###############################################################################
 # Monitoring API Analytics - Pipeline Menu
 # Author: Georges Nassopoulos
-# Version: 1.0.0
+# Version: 1.1.0
 # Description:
 #   CLI menu to run the monitoring-api-analytics workflows:
-#   - run full pipeline (extract -> transform -> load -> metrics) (with data consistency + data quality)
-#   - build metrics only (BigQuery views/tables or SQLite dashboard tables) (with data consistency + data quality)
-#   - run FastAPI service (with data consistency + data quality)
-#   - run tests (pytest)
+#   - run full pipeline (extract -> transform -> load -> metrics)
+#   - build metrics only
+#   - run FastAPI service
+#   - run tests
+#   - run data drift detection
 ###############################################################################
 
 set -euo pipefail
@@ -45,9 +46,11 @@ while true; do
   echo ""
   echo "Select an action:"
   echo " 1) Run full pipeline (extract -> transform -> load -> metrics) (with data consistency + data quality)"
-  echo " 2) Build metrics only (deploy SQL assets / materialize dashboard tables) (with data consistency + data quality)"
-  echo " 3) Run API (uvicorn) (with data consistency + data quality)"
+  echo " 2) Build metrics only (with data consistency + data quality)"
+  echo " 3) Run API (uvicorn)"
   echo " 4) Run tests (pytest)"
+  echo " 5) Run data drift"
+  echo " 6) Full pipeline + drift"
   echo " 0) Exit"
   echo ""
 
@@ -116,6 +119,33 @@ while true; do
       echo ">>> Running pytest"
       cd "${PROJECT_ROOT}"
       $PYTHON_BIN -m pytest -q
+      pause
+      ;;
+    5)
+      ## DATA DRIFT ONLY
+      read -rp "Reference dataset path [default: ./artifacts/reference.csv]: " REF_PATH
+      REF_PATH="${REF_PATH:-./artifacts/reference.csv}"
+
+      read -rp "Current dataset path [default: ./artifacts/current.csv]: " CUR_PATH
+      CUR_PATH="${CUR_PATH:-./artifacts/current.csv}"
+
+      run_python main.py --mode drift --ref "$REF_PATH" --current "$CUR_PATH"
+      pause
+      ;;
+    6)
+      ## FULL PIPELINE + DRIFT
+      read -rp "Source (cloud|json|jsonl|csv) [default: cloud]: " SOURCE
+      SOURCE="${SOURCE:-cloud}"
+
+      read -rp "Reference dataset path [default: ./artifacts/reference.csv]: " REF_PATH
+      REF_PATH="${REF_PATH:-./artifacts/reference.csv}"
+
+      run_python main.py \
+        --extract-transform-load \
+        --source "${SOURCE}" \
+        --with-drift \
+        --ref "${REF_PATH}"
+
       pause
       ;;
     0)

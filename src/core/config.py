@@ -211,7 +211,12 @@ class RuntimeConfig:
             z_threshold: Z-score threshold
             iqr_multiplier: IQR multiplier
             anomaly_strict_mode: Strict validation mode
-            monitoring_streaming_enabled: Enable streaming-oriented monitoring checks            
+            monitoring_streaming_enabled: Enable streaming-oriented monitoring checks
+            drift_detection_enabled: Enable API data drift detection
+            drift_p_value_threshold: Statistical p-value threshold for drift detection
+            drift_medium_threshold: Threshold for medium drift severity
+            drift_high_threshold: Threshold for high drift severity
+            drift_strict_mode: Fail pipeline if drift is too high            
     """
 
     environment: str
@@ -231,6 +236,11 @@ class RuntimeConfig:
     iqr_multiplier: float
     anomaly_strict_mode: bool
     monitoring_streaming_enabled: bool
+    drift_detection_enabled: bool
+    drift_p_value_threshold: float
+    drift_medium_threshold: float
+    drift_high_threshold: float
+    drift_strict_mode: bool    
 
 @dataclass(frozen=True)
 class GcpConfig:
@@ -767,7 +777,7 @@ def _validate_config(config: AppConfig) -> None:
     ## Validate production constraints
     _validate_environment(config)
 
-    ## validate anomaly config
+    ## Validate anomaly config
     if config.runtime.z_threshold <= 0:
         raise ConfigurationError("Z_THRESHOLD must be > 0")
 
@@ -776,6 +786,16 @@ def _validate_config(config: AppConfig) -> None:
 
     if config.runtime.anomaly_method not in {"zscore", "iqr"}:
         raise ConfigurationError("ANOMALY_METHOD must be 'zscore' or 'iqr'")
+
+    ## Validate drift parameters
+    if not (0 < config.runtime.drift_p_value_threshold < 1):
+        raise ConfigurationError("DRIFT_P_VALUE_THRESHOLD must be between 0 and 1")
+
+    if config.runtime.drift_medium_threshold < 0:
+        raise ConfigurationError("DRIFT_MEDIUM_THRESHOLD must be >= 0")
+
+    if config.runtime.drift_high_threshold < config.runtime.drift_medium_threshold:
+        raise ConfigurationError("DRIFT_HIGH_THRESHOLD must be >= DRIFT_MEDIUM_THRESHOLD")
         
 ## ============================================================
 ## EXPORT HELPERS
@@ -905,6 +925,11 @@ def get_config() -> AppConfig:
         iqr_multiplier=_get_env_float("IQR_MULTIPLIER", 1.5),
         anomaly_strict_mode=_get_env_bool("ANOMALY_STRICT_MODE", False),
         monitoring_streaming_enabled=_get_env_bool("MONITORING_STREAMING_ENABLED", True),
+        drift_detection_enabled=_get_env_bool("DRIFT_DETECTION_ENABLED", True),
+        drift_p_value_threshold=_get_env_float("DRIFT_P_VALUE_THRESHOLD", 0.05),
+        drift_medium_threshold=_get_env_float("DRIFT_MEDIUM_THRESHOLD", 0.2),
+        drift_high_threshold=_get_env_float("DRIFT_HIGH_THRESHOLD", 0.5),
+        drift_strict_mode=_get_env_bool("DRIFT_STRICT_MODE", False),        
     )
 
     ## Build data consistency config

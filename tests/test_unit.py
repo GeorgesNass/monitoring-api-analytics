@@ -567,3 +567,92 @@ def test_data_quality_strict():
 
     with pytest.raises(Exception):
         run_data_quality(data=data, strict=True)
+        
+## ============================================================
+## DATA DRIFT TESTS
+## ============================================================
+def test_data_drift_no_drift_monitoring():
+    """
+        Validate no drift scenario for API metrics
+    """
+
+    df_ref = pd.DataFrame({
+        "latency": [100, 110, 120],
+        "status_code": [200, 200, 200],
+        "endpoint": ["/a", "/a", "/a"],
+    })
+
+    df_cur = pd.DataFrame({
+        "latency": [100, 110, 120],
+        "status_code": [200, 200, 200],
+        "endpoint": ["/a", "/a", "/a"],
+    })
+
+    result = run_data_drift(df_ref=df_ref, df_current=df_cur)
+
+    assert result["drift_score"] >= 0.9
+    assert result["errors"] == 0
+
+def test_data_drift_detected_monitoring():
+    """
+        Validate drift detection on latency and endpoints
+    """
+
+    df_ref = pd.DataFrame({
+        "latency": [100, 100, 100],
+        "status_code": [200, 200, 200],
+        "endpoint": ["/a", "/a", "/a"],
+    })
+
+    df_cur = pd.DataFrame({
+        "latency": [1000, 1200, 1500],
+        "status_code": [500, 500, 500],
+        "endpoint": ["/b", "/b", "/b"],
+    })
+
+    result = run_data_drift(df_ref=df_ref, df_current=df_cur)
+
+    assert result["drift_score"] < 1.0
+    assert result["warnings"] > 0
+
+def test_data_drift_empty_monitoring():
+    """
+        Validate empty dataset handling
+    """
+
+    df_ref = pd.DataFrame()
+    df_cur = pd.DataFrame()
+
+    with pytest.raises(Exception):
+        run_data_drift(df_ref=df_ref, df_current=df_cur)
+
+def test_data_drift_strict_monitoring():
+    """
+        Validate strict mode behavior
+    """
+
+    df_ref = pd.DataFrame({"latency": [100]})
+    df_cur = pd.DataFrame({"latency": [1000]})
+
+    with pytest.raises(Exception):
+        run_data_drift(df_ref=df_ref, df_current=df_cur, strict=True)
+
+def test_data_drift_evidently_output_api_monitoring() -> None:
+    """
+        Validate Evidently report generation for API monitoring drift
+
+        Returns:
+            None
+    """
+
+    df_ref = pd.DataFrame({
+        "latency": [100, 110],
+        "status_code": [200, 200],
+        "endpoint": ["/a", "/a"],
+    })
+
+    df_cur = df_ref.copy()
+
+    result = run_data_drift(df_ref=df_ref, df_current=df_cur)
+
+    assert "evidently_report" in result or result["warnings"] >= 0

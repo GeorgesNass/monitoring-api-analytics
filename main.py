@@ -12,6 +12,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+import pandas as pd
 from pathlib import Path
 from typing import Optional
 
@@ -20,6 +21,7 @@ import uvicorn
 from src.core.config import settings
 from src.core.data_consistency import run_data_consistency
 from src.core.data_quality import run_data_quality
+from src.core.data_drift import run_data_drift
 from src.core.errors import (
     ConfigurationError,
     ExtractionError,
@@ -67,6 +69,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--extract-transform-load", action="store_true")
     parser.add_argument("--build-metrics-only", action="store_true")
     parser.add_argument("--run-api", action="store_true")
+    parser.add_argument("--mode", type=str, default="")
+    parser.add_argument("--ref", type=str, default="")
+    parser.add_argument("--current", type=str, default="")
+    parser.add_argument("--with-drift", action="store_true")
 
     ## Pipeline
     parser.add_argument("--source", type=str, default="cloud")
@@ -152,6 +158,26 @@ def main() -> int:
             logger.info("Summary | %s", _build_summary("dry-run", True, start_time))
             return EXIT_SUCCESS
 
+        ## DATA DRIFT ONLY
+        if args.mode == "drift":
+            logger.info("Running data drift")
+
+            df_ref = pd.read_csv(args.ref)
+            df_cur = pd.read_csv(args.current)
+
+            result = run_data_drift(
+                df_ref=df_ref,
+                df_current=df_cur,
+                strict=settings.runtime.drift_strict_mode,
+            )
+
+            logger.info(f"Drift score: {result['drift_score']}")
+            
+            if "evidently_report" in result:
+                logger.info("Evidently report | %s", result["evidently_report"])
+                
+            return EXIT_SUCCESS
+            
         ## METRICS ONLY
         if args.build_metrics_only:
             logger.info("Building metrics | target=%s", args.target)
@@ -253,6 +279,28 @@ def main() -> int:
                 limit=int(args.limit),
             )
 
+            ## DATA DRIFT (post-pipeline)
+            if args.with_drift and settings.runtime.drift_detection_enabled:
+
+                ref_path = Path("artifacts/reference.csv")
+                cur_path = Path("artifacts/current.csv")
+
+                if ref_path.exists() and cur_path.exists():
+
+                    df_ref = pd.read_csv(ref_path)
+                    df_cur = pd.read_csv(cur_path)
+
+                    drift_result = run_data_drift(
+                        df_ref=df_ref,
+                        df_current=df_cur,
+                        strict=settings.runtime.drift_strict_mode,
+                    )
+
+                    logger.info(f"Drift score: {drift_result['drift_score']}")
+ 
+                    if "evidently_report" in drift_result:
+                        logger.info("Evidently report | %s", drift_result["evidently_report"])
+                        
             logger.info("Pipeline completed")
 
         ## API
